@@ -1,6 +1,9 @@
 # Apache Tomcat 11 (JDK 21) の公式イメージを使用
 FROM tomcat:11.0-jdk21
 
+# Renderのヘルスチェック誤検知を防ぐため、Tomcatのシャットダウンポートを無効化
+ENV SERVER_PORT=-1
+
 WORKDIR /usr/local/tomcat
 
 # デフォルトアプリを削除
