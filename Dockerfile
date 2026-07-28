@@ -12,8 +12,8 @@ RUN rm -rf webapps/*
 # 1. HTML/JSP/WEB-INF(web.xml) などをROOTへコピー
 COPY src/main/webapp/ webapps/ROOT/
 
-# 2. ビルド済みクラスファイル(.class)を WEB-INF/classes へコピー
-COPY build/classes/ webapps/ROOT/WEB-INF/classes/
+# 2. Mavenのビルド済みクラスファイル(.class)を WEB-INF/classes へコピー
+COPY target/classes/ webapps/ROOT/WEB-INF/classes/
 
 EXPOSE 8080
 
