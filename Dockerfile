@@ -1,14 +1,18 @@
 # ----------------------------------------------------
-# 1. ビルドステージ：MavenでJavaコードをコンパイル
+# 1. ビルドステージ：JDK21でJavaソースコードをコンパイル
 # ----------------------------------------------------
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
-# POMファイルとソースコードをコピーしてビルド
-COPY pom.xml .
+# ソースコードとWebリソースをコピー
 COPY src ./src
-RUN mvn clean package -DskipTests
+
+# TomcatのServlet API JARを取得してコンパイル（lib配下のJARも含める）
+RUN mkdir -p build/classes && \
+    curl -o servlet-api.jar https://repo1.maven.org/maven2/jakarta/servlet/jakarta.servlet-api/6.0.0/jakarta.servlet-api-6.0.0.jar && \
+    find src/main/java -name "*.java" > sources.txt && \
+    javac -encoding UTF-8 -d build/classes -classpath "servlet-api.jar:src/main/webapp/WEB-INF/lib/*" @sources.txt
 
 # ----------------------------------------------------
 # 2. 実行ステージ：Tomcat 11でアプリを起動
@@ -23,9 +27,11 @@ RUN sed -i 's/port="8005"/port="-1"/g' conf/server.xml
 # デフォルトアプリを削除
 RUN rm -rf webapps/*
 
-# ビルドステージで作成されたクラスファイル・JSP・設定ファイルをROOTへコピー
-COPY --from=builder /app/target/classes/ webapps/ROOT/WEB-INF/classes/
+# HTML/JSP/WEB-INF などのWebリソースをROOTへコピー
 COPY src/main/webapp/ webapps/ROOT/
+
+# コンパイル済みの .class ファイルを WEB-INF/classes へコピー
+COPY --from=builder /app/build/classes/ webapps/ROOT/WEB-INF/classes/
 
 EXPOSE 8080
 
