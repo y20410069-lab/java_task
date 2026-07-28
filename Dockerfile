@@ -1,20 +1,19 @@
-# 1. ビルド環境（Mavenを使ってWARファイルを作成）
-FROM maven:3.9-eclipse-temurin-21 AS builder
-WORKDIR /app
-COPY . .
-RUN mvn clean package -DskipTests
-
-# 2. 実行環境（Apache Tomcat 11 上でアプリを動作させる）
+# Apache Tomcat 11 の公式イメージを使用
 FROM tomcat:11.0-jdk21
+
 WORKDIR /usr/local/tomcat
 
 # 不要なデフォルトアプリを削除
 RUN rm -rf webapps/*
 
-# ビルドしたWARファイルをTomcatのROOT（ルート）として配置
-COPY --from=builder /app/target/*.war webapps/ROOT.war
+# EclipseのWebコンテンツディレクトリ（WebContentまたはsrc/main/webapp）をROOTにコピー
+# WebContent の場合は下の行をそのまま使用します
+COPY WebContent/ webapps/ROOT/
 
-# ポート番号の設定
+# ※もしプロジェクトのフォルダ名が WebContent ではなく src/main/webapp の場合は
+# 上の行をコメントアウトし、下の行の # を消してください
+# COPY src/main/webapp/ webapps/ROOT/
+
 EXPOSE 8080
 
 CMD ["catalina.sh", "run"]
