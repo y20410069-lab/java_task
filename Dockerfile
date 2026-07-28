@@ -1,38 +1,38 @@
-# ----------------------------------------------------
-# 1. ビルドステージ：JDK21でJavaソースコードをコンパイル
-# ----------------------------------------------------
+# --- STAGE 1: Build ---
 FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
-# ソースコードとWebリソースをコピー
-COPY src ./src
+# webapp内の静的リソースおよびWEB-INF構造を準備
+COPY src/main/webapp /app
 
-# TomcatのServlet API JARを取得してコンパイル（lib配下のJARも含める）
-RUN mkdir -p build/classes && \
-    curl -o servlet-api.jar https://repo1.maven.org/maven2/jakarta/servlet/jakarta.servlet-api/6.0.0/jakarta.servlet-api-6.0.0.jar && \
-    find src/main/java -name "*.java" > sources.txt && \
-    javac -encoding UTF-8 -d build/classes -classpath "servlet-api.jar:src/main/webapp/WEB-INF/lib/*" @sources.txt
+# コンパイル結果の出力先ディレクトリを作成
+RUN mkdir -p /app/WEB-INF/classes
 
-# ----------------------------------------------------
-# 2. 実行ステージ：Tomcat 11でアプリを起動
-# ----------------------------------------------------
+# Javaソースコードをコピー
+COPY src/main/java /app/src
+
+# TomcatのServlet APIライブラリを取得してjavacでコンパイル
+RUN curl -o /tmp/servlet-api.jar https://repo1.maven.org/maven2/jakarta/servlet/jakarta.servlet-api/6.0.0/jakarta.servlet-api-6.0.0.jar && \
+    find /app/src -name "*.java" > /tmp/sources.txt && \
+    if [ -s /tmp/sources.txt ]; then \
+      javac -encoding UTF-8 -cp /tmp/servlet-api.jar -d /app/WEB-INF/classes @/tmp/sources.txt; \
+    fi
+
+# --- STAGE 2: Runner ---
 FROM tomcat:11.0-jdk21
 
-WORKDIR /usr/local/tomcat
+# デフォルトのROOTアプリケーション等を削除
+RUN rm -rf /usr/local/tomcat/webapps/*
 
-# server.xml 内のシャットダウンポート (port="8005") を無効化
-RUN sed -i 's/port="8005"/port="-1"/g' conf/server.xml
+# 1. index.jspやWEB-INFなど、webapp配下の全ファイルをwebapps/ROOTへコピー
+COPY src/main/webapp/ /usr/local/tomcat/webapps/ROOT/
 
-# デフォルトアプリを削除
-RUN rm -rf webapps/*
+# 2. ビルドステージでコンパイルしたclassファイルをWEB-INF/classesへ上書き配置
+COPY --from=builder /app/WEB-INF/classes /usr/local/tomcat/webapps/ROOT/WEB-INF/classes
 
-# HTML/JSP/WEB-INF などのWebリソースをROOTへコピー
-COPY src/main/webapp/ webapps/ROOT/
-
-# コンパイル済みの .class ファイルを WEB-INF/classes へコピー
-COPY --from=builder /app/build/classes/ webapps/ROOT/WEB-INF/classes/
-
+# ポート設定
 EXPOSE 8080
 
+# Tomcat起動
 CMD ["catalina.sh", "run"]
